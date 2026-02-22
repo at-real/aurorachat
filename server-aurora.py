@@ -11,7 +11,7 @@ import threading
 import socket
 from flask import session, redirect, url_for
 
-LATEST_VERSION = "4.2"
+LATEST_VERSION = "4.3"
 
 
 # -- TCP Sockets --
