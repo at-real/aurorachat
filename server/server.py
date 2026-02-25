@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, request
+from flask import session, redirect, url_for
 import threading
 import time
 import sys
@@ -9,10 +10,29 @@ import bcrypt
 import hashlib
 import threading
 import socket
-from flask import session, redirect, url_for
 
+import syscmd
+
+# --- Configuration ---
+HOST = '0.0.0.0'
+PORT = 8961
 LATEST_VERSION = "4.3"
+RATE_LIMIT_MS = 1999  # one more millisecond of grace
+MAX_MESSAGE_LENGTH = 456  # holy yappery
+TERMINATION_TRIGGER = "Fleetway"
+FLASK_SECRET_KEY = "[redacted]" # MAKE SURE TO REDACT BEFORE COMMITTING!!
+PANEL_PASSWORD = "[redacted]"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ACCOUNT_DIR = os.path.join(SCRIPT_DIR, "accounts")
+BANNEDUSR_DIR = os.path.join(SCRIPT_DIR, "bannedusers")
+BANNEDIP_DIR = os.path.join(SCRIPT_DIR, "bannedips")
+ADMIN_DIR = os.path.join(SCRIPT_DIR, "admins")
+KNOWNUSR_DIR = os.path.join(SCRIPT_DIR, "knownusers") # at some point this should be merged with the normal account files
 
+os.makedirs(ACCOUNT_DIR, exist_ok=True)
+os.makedirs(BANNEDUSR_DIR, exist_ok=True)
+os.makedirs(ADMIN_DIR, exist_ok=True)
+os.makedirs(KNOWNUSR_DIR, exist_ok=True)
 
 # -- TCP Sockets --
 tcp_clients = []
@@ -54,31 +74,12 @@ def start_tcp_server():
 # Start TCP server in background so that the Flask server doesn't explode
 threading.Thread(target=start_tcp_server, daemon=True).start()
 
-# --- Configuration ---
-HOST = '0.0.0.0'
-PORT = 8961
-RATE_LIMIT_MS = 1999  # one more millisecond of grace
-MAX_MESSAGE_LENGTH = 456  # holy yappery
-TERMINATION_TRIGGER = "Fleetway"
-FLASK_SECRET_KEY = "[redacted]" # MAKE SURE TO REDACT BEFORE COMMITTING!!
-PANEL_PASSWORD = "[redacted]"
-
 # --- Global State ---
 clients = {}
 rate_limit = {}
 connection_times = {}
 latestMsg = ""
 msg_lock = threading.Lock()
-
-# Account file init
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-ACCOUNT_DIR = os.path.join(SCRIPT_DIR, "accounts")
-BANNEDUSR_DIR = os.path.join(SCRIPT_DIR, "bannedusers")
-ADMIN_DIR = os.path.join(SCRIPT_DIR, "admins")
-
-os.makedirs(ACCOUNT_DIR, exist_ok=True)
-os.makedirs(BANNEDUSR_DIR, exist_ok=True)
-os.makedirs(ADMIN_DIR, exist_ok=True)
 
 profanity.load_censor_words(whitelist_words=['yaoi', 'gay', 'lamo', 'frick', 'crap', 'fuck', 'god', 'shit', 'heck', 'hell', 'ass', 'stupid'])
 
@@ -161,30 +162,6 @@ def processMessage(client,data):
                   typeIdentifier = "{}"
             usernameWithIdentifier = f"{typeIdentifier[0]}{client.username}{typeIdentifier[1]}"
             censored_msg = profanity.censor(data['content'].strip(), '*')
-            if data['content'].startswith('/ban '):
-                  parts = data['content'].split(' ', 1)
-                  username_to_ban = parts[1].strip()
-
-                  filepath3 = os.path.join(ADMIN_DIR, client.username)
-                  if not os.path.exists(filepath3):
-                       return {'data':"not admin"}
-
-                  filepath = os.path.join(ACCOUNT_DIR, username_to_ban)
-                  if os.path.exists(filepath):
-                        with open(os.path.join(BANNEDUSR_DIR, username_to_ban), 'w') as f:
-                              f.write('banned')
-            
-            if data['content'].startswith('/unban '):
-                  parts = data['content'].split(' ', 1)
-                  username_to_ban = parts[1].strip()
-
-                  filepath3 = os.path.join(ADMIN_DIR, client.username)
-                  if not os.path.exists(filepath3):
-                       return {'data':"not admin"}
-
-                  filepath = os.path.join(ACCOUNT_DIR, username_to_ban)
-                  if os.path.exists(filepath):
-                        os.remove(os.path.join(BANNEDUSR_DIR, username_to_ban))
             now = int(time.time() * 1000)
             last_msg = rate_limit.get(client, 0)
             if now - last_msg < RATE_LIMIT_MS:
@@ -194,13 +171,14 @@ def processMessage(client,data):
                   return {'data':"TOOLONG",'limit':str(MAX_MESSAGE_LENGTH)}
             latestMsg = f"{usernameWithIdentifier}: {data['content']}\n"
             broadcast(f"{usernameWithIdentifier}: {censored_msg}\n")
+            cmdResult = syscmd.checkCmd(client.username,data['content'],[ACCOUNT_DIR,BANNEDUSR_DIR,BANNEDIP_DIR,ADMIN_DIR,KNOWNUSR_DIR],broadcast)
             return {'data':"MSG_SENT"}
       else:
             return {'data':"NO_LOGIN"}
 
 # --- Client Handling ---
 def handleClient(address, data):
-      filepath = os.path.join(BANNEDUSR_DIR, address)
+      filepath = os.path.join(BANNEDIP_DIR, address)
       if not os.path.exists(filepath):
             client = Client()
             now_ms = int(time.time() * 1000)
@@ -227,6 +205,10 @@ def handleClient(address, data):
 @app.route('/api')
 def error405():
       return "Please use POST instead.", 405
+
+@app.route('/')
+def rootRedirect():
+      return redirect('/api')
 
 # --- Main Server Logic ---
 
