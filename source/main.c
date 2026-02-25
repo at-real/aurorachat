@@ -619,7 +619,7 @@ int main() {
     C2D_SpriteFromImage(&button3, C2D_SpriteSheetGetImage(spriteSheet, 0));
     C2D_SpriteFromImage(&button4, C2D_SpriteSheetGetImage(spriteSheet, 0));
 
-    http_post("http://104.236.25.60:3072/api", "{\"cmd\":\"CONNECT\", \"version\":\"4.2\"}");
+    http_post("http://104.236.25.60:3072/api", "{\"cmd\":\"CONNECT\", \"version\":\"4.3\"}");
     sprintf(buftext, "%s", buf);
     if (strstr(buftext, "OUTDATED") != 0) {
         outdated = true;
