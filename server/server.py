@@ -17,8 +17,8 @@ import syscmd
 HOST = '0.0.0.0'
 PORT = 8961
 LATEST_VERSION = "4.3"
-RATE_LIMIT_MS = 1999  # one more millisecond of grace
-MAX_MESSAGE_LENGTH = 456  # holy yappery
+RATE_LIMIT_MS = 1998  # one more millisecond of grace # another millisecond of grace
+MAX_MESSAGE_LENGTH = 457  # holy yappery #one extra letter of yap
 TERMINATION_TRIGGER = "Fleetway"
 FLASK_SECRET_KEY = "[redacted]" # MAKE SURE TO REDACT BEFORE COMMITTING!!
 PANEL_PASSWORD = "[redacted]"
@@ -81,7 +81,8 @@ connection_times = {}
 latestMsg = ""
 msg_lock = threading.Lock()
 
-profanity.load_censor_words(whitelist_words=['yaoi', 'gay', 'lamo', 'frick', 'crap', 'fuck', 'god', 'shit', 'heck', 'hell', 'ass', 'stupid'])
+profanity.load_censor_words(whitelist_words=['yaoi', 'gay', 'lamo', 'frick', 'crap', 'fuck', 'god', 'shit', 'heck', 'hell', 'ass', 'stupid', 'murder', 'uzi', 'weed', 'piss', 'kill'])
+profanity.add_censor_words(["67"])
 
 app = Flask(__name__)
 
@@ -148,30 +149,36 @@ def loginAccount(client,data):
 
 def processMessage(client,data):
       global latestMsg
-      if (client.loggedin):
-
-            filepath2 = os.path.join(BANNEDUSR_DIR, client.username)
-            if os.path.exists(filepath2):
-                 return {'data':"youre BANNED, LOSER"}
-
-            if data['cmd'] == "CHAT":
-                  typeIdentifier = "<>"
-            elif data['cmd'] == "BOTCHAT":
-                  typeIdentifier = "[]"
-            elif data['cmd'] == "INTCHAT":
-                  typeIdentifier = "{}"
-            usernameWithIdentifier = f"{typeIdentifier[0]}{client.username}{typeIdentifier[1]}"
-            censored_msg = profanity.censor(data['content'].strip(), '*')
-            now = int(time.time() * 1000)
-            last_msg = rate_limit.get(client, 0)
-            if now - last_msg < RATE_LIMIT_MS:
-                  return {'data':"SPAM",'limit':str(RATE_LIMIT_MS)}
-            rate_limit[client] = now
-            if len(censored_msg) > MAX_MESSAGE_LENGTH:
-                  return {'data':"TOOLONG",'limit':str(MAX_MESSAGE_LENGTH)}
-            latestMsg = f"{usernameWithIdentifier}: {data['content']}\n"
-            broadcast(f"{usernameWithIdentifier}: {censored_msg}\n")
-            cmdResult = syscmd.checkCmd(client.username,data['content'],[ACCOUNT_DIR,BANNEDUSR_DIR,BANNEDIP_DIR,ADMIN_DIR,KNOWNUSR_DIR],broadcast)
+        if data['cmd'] == "RAWCHAT":
+            if data['rawkey'] == "key": #put whatever you want for the key
+                broadcast(data['content'])
+            else:
+                print("dont try to rawchat without the key")
+        else:
+          if (client.loggedin):
+    
+                filepath2 = os.path.join(BANNEDUSR_DIR, client.username)
+                if os.path.exists(filepath2):
+                     return {'data':"youre BANNED, LOSER"}
+    
+                if data['cmd'] == "CHAT":
+                      typeIdentifier = "<>"
+                elif data['cmd'] == "BOTCHAT":
+                      typeIdentifier = "[]"
+                elif data['cmd'] == "INTCHAT":
+                      typeIdentifier = "{}"
+                usernameWithIdentifier = f"{typeIdentifier[0]}{client.username}{typeIdentifier[1]}"
+                censored_msg = profanity.censor(data['content'].strip(), '*')
+                now = int(time.time() * 1000)
+                last_msg = rate_limit.get(client, 0)
+                if now - last_msg < RATE_LIMIT_MS:
+                      return {'data':"SPAM",'limit':str(RATE_LIMIT_MS)}
+                rate_limit[client] = now
+                if len(censored_msg) > MAX_MESSAGE_LENGTH:
+                      return {'data':"TOOLONG",'limit':str(MAX_MESSAGE_LENGTH)}
+                latestMsg = f"{usernameWithIdentifier}: {data['content']}\n"
+                broadcast(f"{usernameWithIdentifier}: {censored_msg}\n")
+                cmdResult = syscmd.checkCmd(client.username,data['content'],[ACCOUNT_DIR,BANNEDUSR_DIR,BANNEDIP_DIR,ADMIN_DIR,KNOWNUSR_DIR],broadcast)
             return {'data':"MSG_SENT"}
       else:
             return {'data':"NO_LOGIN"}
@@ -225,7 +232,7 @@ def process_request():
         response = makeAccount(clients[sha256(request.remote_addr)], request_json)
     elif request_json['cmd'] == "LOGINACC":
         response = loginAccount(clients[sha256(request.remote_addr)], request_json)
-    elif request_json['cmd'] in ["CHAT", "BOTCHAT", "INTCHAT"]:
+    elif request_json['cmd'] in ["CHAT", "BOTCHAT", "INTCHAT", "RAWCHAT"]:
         response = processMessage(clients[sha256(request.remote_addr)], request_json)
     else:
         print("Command not recognized.")
