@@ -152,8 +152,10 @@ def processMessage(client,data):
         if data['cmd'] == "RAWCHAT":
             if data['rawkey'] == "key": #put whatever you want for the key
                 broadcast(data['content'])
+                return {'data':"message sent"}
             else:
                 print("dont try to rawchat without the key")
+                return {'data':"wrong/no key"}
         else:
           if (client.loggedin):
     
@@ -179,9 +181,9 @@ def processMessage(client,data):
                 latestMsg = f"{usernameWithIdentifier}: {data['content']}\n"
                 broadcast(f"{usernameWithIdentifier}: {censored_msg}\n")
                 cmdResult = syscmd.checkCmd(client.username,data['content'],[ACCOUNT_DIR,BANNEDUSR_DIR,BANNEDIP_DIR,ADMIN_DIR,KNOWNUSR_DIR],broadcast)
-            return {'data':"MSG_SENT"}
-      else:
-            return {'data':"NO_LOGIN"}
+                return {'data':"MSG_SENT"}
+          else:
+                return {'data':"NO_LOGIN"}
 
 # --- Client Handling ---
 def handleClient(address, data):
