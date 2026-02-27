@@ -22,6 +22,8 @@ MAX_MESSAGE_LENGTH = 457  # holy yappery #one extra letter of yap
 TERMINATION_TRIGGER = "Fleetway"
 FLASK_SECRET_KEY = "[redacted]" # MAKE SURE TO REDACT BEFORE COMMITTING!!
 PANEL_PASSWORD = "[redacted]"
+RAWCHAT_KEY = "[redacted]"
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ACCOUNT_DIR = os.path.join(SCRIPT_DIR, "accounts")
 BANNEDUSR_DIR = os.path.join(SCRIPT_DIR, "bannedusers")
@@ -145,23 +147,23 @@ def loginAccount(client,data):
                         return {'data':"LOGIN_FAKE_ACC"}
             else:
                  print("you're BANNED. LOSER")
-                 return {'data':"frick you you're BANNED"}
+                 return {'data':"BANNED"}
 
 def processMessage(client,data):
       global latestMsg
         if data['cmd'] == "RAWCHAT":
-            if data['rawkey'] == "key": #put whatever you want for the key
+            if data['rawkey'] == RAWCHAT_KEY: #put whatever you want for the key
                 broadcast(data['content'])
-                return {'data':"message sent"}
+                return {'data':"MSG_SENT"}
             else:
                 print("dont try to rawchat without the key")
-                return {'data':"wrong/no key"}
+                return {'data':"WRONG_KEY"}
         else:
           if (client.loggedin):
     
                 filepath2 = os.path.join(BANNEDUSR_DIR, client.username)
                 if os.path.exists(filepath2):
-                     return {'data':"youre BANNED, LOSER"}
+                     return {'data':"BANNED"}
     
                 if data['cmd'] == "CHAT":
                       typeIdentifier = "<>"
