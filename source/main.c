@@ -4,10 +4,7 @@
    __ _ _   _ _ __ ___  _ __ __ _  ___| |__   __ _| |_ 
   / _` | | | | '__/ _ \| '__/ _` |/ __| '_ \ / _` | __|
  | (_| | |_| | | | (_) | | | (_| | (__| | | | (_| | |_ 
-  \__,_|\__,_|_|  \___/|_|  \__,_|\___|_| |_|\__,_|\__|                    
-             __  __     __  ______ __     
-            |__)|_ |  ||__)| |  | |_ |\ | 
-            | \ |__|/\|| \ | |  | |__| \| 
+  \__,_|\__,_|_|  \___/|_|  \__,_|\___|_| |_|\__,_|\__|                  
                               
 
     Project initialized and owned by: mii-man
@@ -31,8 +28,9 @@
     This code is owned underneath the license given with the project, if you are to distribute this code the license is required to be with the code.
     
 
-
-    This is a rewrite of the original aurorachat, remade to use aurorahttp by Orstando and to have much better choices. The comment you've just read was created by VirtuallyExisting / Virtualle, have a good day!
+	Aurorachat has recently been completely reworked to have some parts of the code use HTTP instead of sockets.
+    
+	The comment you've just read was created by VirtuallyExisting / Virtualle (and edited by Orstando), have a good day!
 
 
 */
@@ -59,8 +57,6 @@ Or else.
 
 Have a great day!
 */
-
-/* Oh yeah, and don't remove my newlines. Thanks! -hackertron */
 
 
 
