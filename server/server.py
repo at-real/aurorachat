@@ -260,12 +260,15 @@ def process_request():
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
-        if request.form['password'] == PANEL_PASSWORD:
-            session['admin'] = True
-            return redirect('/admin')
-        return 'Invalid password', 401
+        if os.path.isfile(request.form['username']):
+            with open(os.path.join(ADMIN_DIR,request.form['username']) as f:
+                if request.form['password'] == f.read():
+                    session['admin'] = True
+                    return redirect('/admin')
+        return 'Invalid username or password', 401
     return '''
     <form method="POST">
+        <input type="text" name="username" placeholder="Username" required>
         <input type="password" name="password" placeholder="Password" required>
         <button type="submit">Login</button>
     </form>
