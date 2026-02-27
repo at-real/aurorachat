@@ -13,6 +13,10 @@ import socket
 
 import syscmd
 
+from flask import session, redirect, url_for
+from flask_socketio import SocketIO, emit
+from flask_cors import CORS
+
 # --- Configuration ---
 HOST = '0.0.0.0'
 PORT = 8961
@@ -45,6 +49,8 @@ def broadcast(message):
             client.sendall(message.encode('utf-8'))
         except:
             tcp_clients.remove(client)
+            
+    socketio.emit('message', message)
 
 def handle_tcp_client(client_socket):
     try:
@@ -73,9 +79,6 @@ def start_tcp_server():
         t = threading.Thread(target=handle_tcp_client, args=(client_sock,), daemon=True)
         t.start()
 
-# Start TCP server in background so that the Flask server doesn't explode
-threading.Thread(target=start_tcp_server, daemon=True).start()
-
 # --- Global State ---
 clients = {}
 rate_limit = {}
@@ -89,6 +92,12 @@ profanity.add_censor_words(["67"])
 app = Flask(__name__)
 
 app.secret_key = FLASK_SECRET_KEY
+
+CORS(app)
+
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+socketio.start_background_task(start_tcp_server)
 
 # --- Helper Functions ---
 def sha256(data):
@@ -283,8 +292,14 @@ def ban_user():
     return redirect('/admin')
 
 
+@socketio.on('connect')
+def handle_connect():
+    print("WS Connection Established.")
+    socketio.emit('message', 'Connected!')
+
+
 
 
 
 if __name__ == "__main__":
-      app.run(host="0.0.0.0", port=3072, threaded=True, use_reloader=False)
+      socketio.run(app, host="0.0.0.0", port=3072, use_reloader=False)
