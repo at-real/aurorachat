@@ -1074,6 +1074,7 @@ int main() {
             }
             else {
                 rulesvisible = 0;
+				chatlock = false;
             }
             rulescroll = 0;
         } /* You wanna see the rules, huh? Huh? Punk? */ // moved to int so there can be rule pages
