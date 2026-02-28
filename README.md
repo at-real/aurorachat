@@ -26,6 +26,8 @@ This repository is <b>open</b> for contributions! If you'd like to, you may open
   
   | Version | Status | Changelog |
   |--------|--------|--------|
+  | v1.0.0 | In Development | Voice Chat, Drawings, Servers/Rooms, Miis, and more. |
+  | v0.4.3 | Released | New themes, platform tags, and more! |
   | v0.0.4.2 | Released | bug fixes|
   | v0.0.4.1 | Released | bug fixes |
   | v0.0.4.0 | Released | TLS verification, accounts, audio, GUI overhaul |
