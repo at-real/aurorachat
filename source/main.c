@@ -4,7 +4,10 @@
    __ _ _   _ _ __ ___  _ __ __ _  ___| |__   __ _| |_ 
   / _` | | | | '__/ _ \| '__/ _` |/ __| '_ \ / _` | __|
  | (_| | |_| | | | (_) | | | (_| | (__| | | | (_| | |_ 
-  \__,_|\__,_|_|  \___/|_|  \__,_|\___|_| |_|\__,_|\__|                  
+  \__,_|\__,_|_|  \___/|_|  \__,_|\___|_| |_|\__,_|\__|                    
+             __  __     __  ______ __     
+            |__)|_ |  ||__)| |  | |_ |\ | 
+            | \ |__|/\|| \ | |  | |__| \| 
                               
 
     Project initialized and owned by: mii-man
@@ -28,9 +31,8 @@
     This code is owned underneath the license given with the project, if you are to distribute this code the license is required to be with the code.
     
 
-	Aurorachat has recently been completely reworked to have some parts of the code use HTTP instead of sockets.
-    
-	The comment you've just read was created by VirtuallyExisting / Virtualle (and edited by Orstando), have a good day!
+
+    This is a rewrite of the original aurorachat, remade to use aurorahttp by Orstando and to have much better choices. The comment you've just read was created by VirtuallyExisting / Virtualle, have a good day!
 
 
 */
@@ -58,6 +60,8 @@ Or else.
 Have a great day!
 */
 
+/* Oh yeah, and don't remove my newlines. Thanks! -hackertron */
+
 
 
 #include <3ds.h>
@@ -71,6 +75,9 @@ Have a great day!
 #include <sys/socket.h>
 
 #include <3ds/applets/swkbd.h>
+
+#include <3ds/types.h>
+#include <3ds/services/cfgu.h>
 
 /*
 
@@ -659,18 +666,64 @@ int main() {
     u32 themecolorb = C2D_Color32(255, 255, 255, 255);
     u32 logocolor = C2D_Color32(0, 0, 0, 200);
 
-    u32 textcolor_temp = C2D_Color32(0, 0, 0, 255);
-    u32 themecolor_temp = C2D_Color32(0, 0, 0, 255);
+    //for "normal" (reversi = 0)
+    u32 colA = C2D_Color32(0, 0, 0, 200); //top text
+    u32 colB = C2D_Color32(255, 255, 255, 255); //top theme
+    u32 colC = C2D_Color32(0, 0, 0, 200); //bottom text
+    u32 colD = C2D_Color32(255, 255, 255, 255); //bottom theme
+    u32 colE = C2D_Color32(0, 0, 100, 200); //logo text
+
+    //reqs for holographic
+    accelVector myGyro;
+    myGyro.x = 0;
+    myGyro.y = 0;
+    myGyro.z = 0;
+    int inte = 10; //less is more!
+    HIDUSER_EnableAccelerometer();
 
     int darkmode = 0; /* keeping the name just in case but most of these are probably too bright lol */
-    int themecount = 19; // just in case--it's actually one less
-    bool reversi;
+    int themecount = 20; // just in case--it's actually one less
+    int reversi; // ask and you shall receive
     char currenttheme[30] = "none"; /* it'd be nice if it could tell you which one you're using... */
+    char thememode[16] = "none";
 
     int rulesvisible = 0;
+    bool chatlock; //true to scroll rules, false to scroll chat
+    float rulescroll = 0.0f; //chatscroll for da rules
     
     int silly = 0; //used for the silly rules check
 
+    // whatcha running
+    cfguInit();
+    u8 model = 7;
+    CFGU_GetSystemModel(&model);
+    cfguExit();
+
+    char detectsystem[10];
+    switch (model) {
+    case 0:
+        strcpy(detectsystem, "3DS");
+        break;
+    case 1:
+        strcpy(detectsystem, "3DSXL");
+        break;
+    case 2:
+        strcpy(detectsystem, "N3DS");
+        break;
+    case 3:
+        strcpy(detectsystem, "2DS");
+        break;
+    case 4:
+        strcpy(detectsystem, "N3DSXL");
+        break;
+    case 5:
+        strcpy(detectsystem, "N2DSXL");
+        break;
+    default:
+        strcpy(detectsystem, "evil mode");
+        break;
+    }
+    // ^
 
     /*
     
@@ -722,22 +775,24 @@ int main() {
         6 - Pearl Plus
         7 - Emerald Plus
 
+        8 - Holographic
+
         >REVERSI-APPLICABLE THEMES<
 
-        8 - Lemon Soda
-        9 - Cinnamon
-        10 - Tropical
-        11 - Glacier
-        12 - Eyestrain Deluxe
+        9 - Lemon Soda
+        10 - Cinnamon
+        11 - Tropical
+        12 - Glacier
+        13 - Eyestrain Deluxe
 
         >USER-SUBMISSION THEMES<
-        13 - Bread Guy's Theme (Bread Guy)
-        14 - hacker torn tyehme. (cool guy)
-        15 - P3 Phosphor (waydoing)
-		16 - Slowpoke Pink (Slow)
-        17 - Sky (DJ)
-        18 - GB Green (Slow)
-        19 - Homebrew Blue (Slow)
+        14 - Bread Guy's Theme (Bread Guy)
+        15 - hacker torn tyehme. (cool guy)
+        16 - P3 Phosphor (waydoing)
+		17 - Slowpoke Pink (Slow)
+        18 - Sky (DJ)
+        19 - GB Green (Slow)
+        20 - Homebrew Blue (Slow)
 
         + theme reversing with X cause you asked for it
         */
@@ -761,265 +816,266 @@ int main() {
         } /* Cycle through themes, counting down */
 
         if (hidKeysDown() & KEY_X) {
-            reversi = !reversi;
+            //reversi = !reversi;
+            if (reversi < 3) {
+                reversi += 1;
+            }
+            else {
+                reversi = 0;
+            }
         } /* it keeps updating so this is all i got */
+        // 0 = normal, 1 = reverse, 2 = top only, 3 = bottom only
 
         if (darkmode == 0) {
-            textcolor = C2D_Color32(0, 0, 0, 200);
-            themecolor = C2D_Color32(255, 255, 255, 255);
-            textcolorb = C2D_Color32(0, 0, 0, 200);
-            themecolorb = C2D_Color32(255, 255, 255, 255);
-            logocolor = C2D_Color32(0, 0, 100, 200);
+            colA = C2D_Color32(0, 0, 0, 200);
+            colB = C2D_Color32(255, 255, 255, 255);
+            colC = C2D_Color32(0, 0, 0, 200);
+            colD = C2D_Color32(255, 255, 255, 255);
+            colE = C2D_Color32(0, 0, 100, 200);
             strcpy(currenttheme, "Basic Light");
         } /* Basic Light */
 
         if (darkmode == 1) {
-            textcolor = C2D_Color32(255, 255, 255, 200);
-            themecolor = C2D_Color32(0, 0, 0, 255);
-            textcolorb = C2D_Color32(255, 255, 255, 200);
-            themecolorb = C2D_Color32(0, 0, 0, 255);
-            logocolor = C2D_Color32(0, 0, 100, 200);
+            colA = C2D_Color32(255, 255, 255, 200);
+            colB = C2D_Color32(0, 0, 0, 255);
+            colC = C2D_Color32(255, 255, 255, 200);
+            colD = C2D_Color32(0, 0, 0, 255);
+            colE = C2D_Color32(0, 0, 100, 200);
             strcpy(currenttheme, "Basic Dark");
         } /* Basic Dark */
 
         if (darkmode == 2) {
-            textcolor = C2D_Color32(0, 0, 0, 200);
-            themecolor = C2D_Color32(0, 0, 255, 255);
-            textcolorb = C2D_Color32(0, 0, 0, 200);
-            themecolorb = C2D_Color32(0, 0, 255, 255);
-            logocolor = C2D_Color32(0, 0, 0, 255);
+            colA = C2D_Color32(0, 0, 0, 200);
+            colB = C2D_Color32(0, 0, 255, 255);
+            colC = C2D_Color32(0, 0, 0, 200);
+            colD = C2D_Color32(0, 0, 255, 255);
+            colE = C2D_Color32(0, 0, 0, 255);
             strcpy(currenttheme, "HBChat Legacy");
         } /* HBChat Legacy */
 
         if (darkmode == 3) {
-            textcolor = C2D_Color32(106, 142, 174, 200);
-            themecolor = C2D_Color32(209, 250, 255, 255);
-            textcolorb = C2D_Color32(106, 142, 174, 200);
-            themecolorb = C2D_Color32(209, 250, 255, 255);
-            logocolor = C2D_Color32(54, 38, 167, 200);
+            colA = C2D_Color32(106, 142, 174, 200);
+            colB = C2D_Color32(209, 250, 255, 255);
+            colC = C2D_Color32(106, 142, 174, 200);
+            colD = C2D_Color32(209, 250, 255, 255);
+            colE = C2D_Color32(54, 38, 167, 200);
             strcpy(currenttheme, "Glacier Plus");
         } /* Glacier Plus */
 
         if (darkmode == 4) {
-            textcolor = C2D_Color32(157, 99, 129, 200);
-            themecolor = C2D_Color32(28, 2, 33, 255);
-            textcolorb = C2D_Color32(157, 99, 129, 200);
-            themecolorb = C2D_Color32(28, 2, 33, 255);
-            logocolor = C2D_Color32(255, 234, 238, 200);
+            colA = C2D_Color32(157, 99, 129, 200);
+            colB = C2D_Color32(28, 2, 33, 255);
+            colC = C2D_Color32(157, 99, 129, 200);
+            colD = C2D_Color32(28, 2, 33, 255);
+            colE = C2D_Color32(255, 234, 238, 200);
             strcpy(currenttheme, "Velvet Plus");
         } /* Velvet Plus */
 
         if (darkmode == 5) {
-            textcolor = C2D_Color32(199, 255, 237, 200);
-            themecolor = C2D_Color32(89, 101, 111, 255);
-            textcolorb = C2D_Color32(199, 255, 237, 200);
-            themecolorb = C2D_Color32(89, 101, 111, 255);
-            logocolor = C2D_Color32(255, 159, 28, 200);
+            colA = C2D_Color32(199, 255, 237, 200);
+            colB = C2D_Color32(89, 101, 111, 255);
+            colC = C2D_Color32(199, 255, 237, 200);
+            colD = C2D_Color32(89, 101, 111, 255);
+            colE = C2D_Color32(255, 159, 28, 200);
             strcpy(currenttheme, "Slate Plus");
         } /* Slate Plus */
 
         if (darkmode == 6) {
-            textcolor = C2D_Color32(255, 56, 100, 200);
-            themecolor = C2D_Color32(245, 215, 217, 255);
-            textcolorb = C2D_Color32(255, 56, 100, 200);
-            themecolorb = C2D_Color32(245, 215, 217, 255);
-            logocolor = C2D_Color32(72, 172, 240, 200);
+            colA = C2D_Color32(255, 56, 100, 200);
+            colB = C2D_Color32(245, 215, 217, 255);
+            colC = C2D_Color32(255, 56, 100, 200);
+            colD = C2D_Color32(245, 215, 217, 255);
+            colE = C2D_Color32(72, 172, 240, 200);
             strcpy(currenttheme, "Pearl Plus");
         } /* Pearl Plus */
 
         if (darkmode == 7) {
-            textcolor = C2D_Color32(189, 228, 168, 200);
-            themecolor = C2D_Color32(15, 82, 87, 255);
-            textcolorb = C2D_Color32(189, 228, 168, 200);
-            themecolorb = C2D_Color32(15, 82, 87, 255);
-            logocolor = C2D_Color32(234, 53, 70, 200);
+            colA = C2D_Color32(189, 228, 168, 200);
+            colB = C2D_Color32(15, 82, 87, 255);
+            colC = C2D_Color32(189, 228, 168, 200);
+            colD = C2D_Color32(15, 82, 87, 255);
+            colE = C2D_Color32(234, 53, 70, 200);
             strcpy(currenttheme, "Emerald Plus");
         } /* Emerald Plus */
 
         if (darkmode == 8) {
-            if (!reversi) {
-                textcolor = C2D_Color32(230, 57, 70, 200);
-                themecolor = C2D_Color32(254, 240, 204, 255);
-                textcolorb = C2D_Color32(16, 255, 203, 200);
-                themecolorb = C2D_Color32(40, 196, 200, 255);
-                logocolor = C2D_Color32(253, 26, 109, 200);
-            }
-            if (reversi) {
-                textcolor = C2D_Color32(16, 255, 203, 200);
-                themecolor = C2D_Color32(40, 196, 200, 255);
-                textcolorb = C2D_Color32(230, 57, 70, 200);
-                themecolorb = C2D_Color32(254, 240, 204, 255);
-                logocolor = C2D_Color32(253, 26, 109, 200);
-            }
+            hidAccelRead(&myGyro);
+
+            //with accel, base Y always comes up as -512, which makes this a silly green
+
+            int modR = (abs((myGyro.y) / inte) + abs(myGyro.z / inte));
+            int modG = (abs(myGyro.x / inte) + abs(myGyro.z / inte));
+            int modB = (abs(myGyro.x / inte) + abs((myGyro.y) / inte));
+
+            u8 holoR = (255 - modR); //x
+            u8 holoG = (255 - modG); //y
+            u8 holoB = (255 - modB); //z
+
+            colA = C2D_Color32(0, 0, 0, 200);
+            colB = C2D_Color32(holoR, holoG, holoB, 255);
+            colC = C2D_Color32(0, 0, 0, 200);
+            colD = C2D_Color32(holoR, holoG, holoB, 255);
+            colE = C2D_Color32(0, 0, 0, 200);
+            strcpy(currenttheme, "Holographic");
+        } /* Holographic */
+
+        if (darkmode == 9) {
+            colA = C2D_Color32(230, 57, 70, 200);
+            colB = C2D_Color32(254, 240, 204, 255);
+            colC = C2D_Color32(16, 255, 203, 200);
+            colD = C2D_Color32(40, 196, 200, 255);
+            colE = C2D_Color32(253, 26, 109, 200);
             strcpy(currenttheme, "Lemon Soda");
         } /* Lemon Soda */
 
-        if (darkmode == 9) {
-            if (!reversi) {
-                textcolor = C2D_Color32(235, 212, 203, 200);
-                themecolor = C2D_Color32(182, 70, 95, 255);
-                textcolorb = C2D_Color32(218, 159, 147, 200);
-                themecolorb = C2D_Color32(137, 6, 32, 255);
-                logocolor = C2D_Color32(44, 7, 3, 200);
-            }
-            if (reversi) {
-                textcolor = C2D_Color32(218, 159, 147, 200);
-                themecolor = C2D_Color32(137, 6, 32, 255);
-                textcolorb = C2D_Color32(235, 212, 203, 200);
-                themecolorb = C2D_Color32(182, 70, 95, 255);
-                logocolor = C2D_Color32(44, 7, 3, 200);
-            }
+        if (darkmode == 10) {
+            colA = C2D_Color32(235, 212, 203, 200);
+            colB = C2D_Color32(182, 70, 95, 255);
+            colC = C2D_Color32(218, 159, 147, 200);
+            colD = C2D_Color32(137, 6, 32, 255);
+            colE = C2D_Color32(44, 7, 3, 200);
             strcpy(currenttheme, "Cinnamon");
         } /* Cinnamon */
 
-        if (darkmode == 10) {
-            if (!reversi) {
-                textcolor = C2D_Color32(255, 217, 125, 200);
-                themecolor = C2D_Color32(255, 108, 74, 255);
-                textcolorb = C2D_Color32(170, 246, 131, 200);
-                themecolorb = C2D_Color32(59, 201, 123, 255);
-                logocolor = C2D_Color32(255, 255, 255, 200);
-            }
-            if (reversi) {
-                textcolor = C2D_Color32(170, 246, 131, 200);
-                themecolor = C2D_Color32(59, 201, 123, 255);
-                textcolorb = C2D_Color32(255, 217, 125, 200);
-                themecolorb = C2D_Color32(255, 108, 74, 255);
-                logocolor = C2D_Color32(255, 255, 255, 200);
-            }
+        if (darkmode == 11) {
+            colA = C2D_Color32(255, 217, 125, 200);
+            colB = C2D_Color32(255, 108, 74, 255);
+            colC = C2D_Color32(170, 246, 131, 200);
+            colD = C2D_Color32(59, 201, 123, 255);
+            colE = C2D_Color32(255, 255, 255, 200);
             strcpy(currenttheme, "Tropical");
         } /* Tropical */
 
-        if (darkmode == 11) {
-            if (!reversi) {
-                textcolor = C2D_Color32(19, 64, 116, 200);
-                themecolor = C2D_Color32(238, 244, 237, 255);
-                textcolorb = C2D_Color32(141, 169, 196, 200);
-                themecolorb = C2D_Color32(11, 37, 69, 255);
-                logocolor = C2D_Color32(19, 49, 92, 200);
-            }
-            if (reversi) {
-                textcolor = C2D_Color32(141, 169, 196, 200);
-                themecolor = C2D_Color32(11, 37, 69, 255);
-                textcolorb = C2D_Color32(19, 64, 116, 200);
-                themecolorb = C2D_Color32(238, 244, 237, 255);
-                logocolor = C2D_Color32(19, 49, 92, 200);
-            }
+        if (darkmode == 12) {
+            colA = C2D_Color32(19, 64, 116, 200);
+            colB = C2D_Color32(238, 244, 237, 255);
+            colC = C2D_Color32(141, 169, 196, 200);
+            colD = C2D_Color32(11, 37, 69, 255);
+            colE = C2D_Color32(19, 49, 92, 200);
             strcpy(currenttheme, "Iceberg");
         } /* Iceberg */
 
-        if (darkmode == 12) {
-            if (!reversi) {
-                textcolor = C2D_Color32(0, 255, 255, 200);
-                themecolor = C2D_Color32(255, 0, 0, 255);
-                textcolorb = C2D_Color32(255, 0, 255, 200);
-                themecolorb = C2D_Color32(0, 255, 0, 255);
-                logocolor = C2D_Color32(0, 0, 0, 200);
-            }
-            if (reversi) {
-                textcolor = C2D_Color32(255, 0, 255, 200);
-                themecolor = C2D_Color32(0, 255, 0, 255);
-                textcolorb = C2D_Color32(0, 255, 255, 200);
-                themecolorb = C2D_Color32(255, 0, 0, 255);
-                logocolor = C2D_Color32(0, 0, 0, 200);
-            }
+        if (darkmode == 13) {
+            colA = C2D_Color32(0, 255, 255, 200);
+            colB = C2D_Color32(255, 0, 0, 255);
+            colC = C2D_Color32(255, 0, 255, 200);
+            colD = C2D_Color32(0, 255, 0, 255);
+            colE = C2D_Color32(0, 0, 0, 200);
             strcpy(currenttheme, "Eyestrain Deluxe");
         } /* Eyestrain Deluxe */
 
         // user reqs from here on out! thanks for the submissions!
 
-        if (darkmode == 13) {
-            textcolor = C2D_Color32(102, 216, 220, 200);
-            themecolor = C2D_Color32(14, 53, 73, 255);
-            textcolorb = C2D_Color32(102, 216, 220, 200);
-            themecolorb = C2D_Color32(14, 53, 73, 255);
-            logocolor = C2D_Color32(107, 214, 118, 200);
+        if (darkmode == 14) {
+            colA = C2D_Color32(102, 216, 220, 200);
+            colB = C2D_Color32(14, 53, 73, 255);
+            colC = C2D_Color32(102, 216, 220, 200);
+            colD = C2D_Color32(14, 53, 73, 255);
+            colE = C2D_Color32(107, 214, 118, 200);
             strcpy(currenttheme, "Bread Guy's Theme");
         } /* Bread Guy's Theme */
 
-        if (darkmode == 14) {
-            textcolor = C2D_Color32(17, 255, 0, 200);
-            themecolor = C2D_Color32(0, 0, 0, 255);
-            textcolorb = C2D_Color32(17, 255, 0, 200);
-            themecolorb = C2D_Color32(0, 0, 0, 255);
-            logocolor = C2D_Color32(17, 255, 0, 200);
+        if (darkmode == 15) {
+            colA = C2D_Color32(17, 255, 0, 200);
+            colB = C2D_Color32(0, 0, 0, 255);
+            colC = C2D_Color32(17, 255, 0, 200);
+            colD = C2D_Color32(0, 0, 0, 255);
+            colE = C2D_Color32(17, 255, 0, 200);
             strcpy(currenttheme, "hacker torn tyehme.");
         } /* hacker torn tyehme. */
 
-        if (darkmode == 15) {
-			textcolor = C2D_Color32(255, 176, 0, 255);
-			themecolor = C2D_Color32(28, 28, 28, 255);
-			textcolorb = C2D_Color32(255, 176, 0, 255);
-			themecolorb = C2D_Color32(28, 28, 28, 255);
-			logocolor = C2D_Color32(255, 176, 0, 255);
+        if (darkmode == 16) {
+			colA = C2D_Color32(255, 176, 0, 255);
+			colB = C2D_Color32(28, 28, 28, 255);
+			colC = C2D_Color32(255, 176, 0, 255);
+			colD = C2D_Color32(28, 28, 28, 255);
+			colE = C2D_Color32(255, 176, 0, 255);
 			strcpy(currenttheme, "P3 Phosphor");
 		} /* P3 Phosphor */
 		
-		if (darkmode == 16) {
-            textcolor = C2D_Color32(9, 44, 84, 200);
-            themecolor = C2D_Color32(245, 120, 198, 255);
-            textcolorb = C2D_Color32(9, 44, 84, 200);
-            themecolorb = C2D_Color32(245, 120, 198, 255);
-            logocolor = C2D_Color32(255, 237, 167, 200);
+		if (darkmode == 17) {
+            colA = C2D_Color32(9, 44, 84, 200);
+            colB = C2D_Color32(245, 120, 198, 255);
+            colC = C2D_Color32(9, 44, 84, 200);
+            colD = C2D_Color32(245, 120, 198, 255);
+            colE = C2D_Color32(255, 237, 167, 200);
             strcpy(currenttheme, "Slowpoke Pink");
         } /* Slowpoke Pink */
 
-        if (darkmode == 17) {
-            textcolor = C2D_Color32(241, 241, 241, 200);
-            themecolor = C2D_Color32(99, 183, 219, 255);
-            textcolorb = C2D_Color32(241, 241, 241, 200);
-            themecolorb = C2D_Color32(99, 183, 219, 255);
-            logocolor = C2D_Color32(192, 255, 255, 200);
+        if (darkmode == 18) {
+            colA = C2D_Color32(241, 241, 241, 200);
+            colB = C2D_Color32(99, 183, 219, 255);
+            colC = C2D_Color32(241, 241, 241, 200);
+            colD = C2D_Color32(99, 183, 219, 255);
+            colE = C2D_Color32(192, 255, 255, 200);
             strcpy(currenttheme, "Sky");
         } /* Sky */
 
-        if (darkmode == 18) {
-            if (!reversi) {
-                textcolor = C2D_Color32(32, 91, 92, 200);
-                themecolor = C2D_Color32(159, 228, 97, 255);
-                textcolorb = C2D_Color32(159, 228, 97, 200);
-                themecolorb = C2D_Color32(32, 91, 92, 255);
-                logocolor = C2D_Color32(89, 145, 50, 200);
-            }
-            if (reversi) {
-                textcolor = C2D_Color32(159, 228, 97, 200);
-                themecolor = C2D_Color32(32, 91, 92, 255);
-                textcolorb = C2D_Color32(32, 91, 92, 200);
-                themecolorb = C2D_Color32(159, 228, 97, 255);
-                logocolor = C2D_Color32(89, 145, 50, 200);
-            }
+        if (darkmode == 19) {
+            colA = C2D_Color32(32, 91, 92, 200);
+            colB = C2D_Color32(159, 228, 97, 255);
+            colC = C2D_Color32(159, 228, 97, 200);
+            colD = C2D_Color32(32, 91, 92, 255);
+            colE = C2D_Color32(89, 145, 50, 200);
             strcpy(currenttheme, "GB Green");
         } /* GB Green */
 
-        if (darkmode == 19) {
-            if (!reversi) {
-                textcolor = C2D_Color32(203, 231, 255, 200);
-                themecolor = C2D_Color32(0, 132, 255, 255);
-                textcolorb = C2D_Color32(255, 255, 255, 200);
-                themecolorb = C2D_Color32(68, 175, 255, 255);
-                logocolor = C2D_Color32(98, 219, 252, 200);
-            }
-            if (reversi) {
-                textcolor = C2D_Color32(255, 255, 255, 200);
-                themecolor = C2D_Color32(68, 175, 255, 255);
-                textcolorb = C2D_Color32(203, 231, 255, 200);
-                themecolorb = C2D_Color32(0, 132, 255, 255);
-                logocolor = C2D_Color32(98, 219, 252, 200);
-            }
-
+        if (darkmode == 20) {
+            colA = C2D_Color32(203, 231, 255, 200);
+            colB = C2D_Color32(0, 132, 255, 255);
+            colC = C2D_Color32(255, 255, 255, 200);
+            colD = C2D_Color32(68, 175, 255, 255);
+            colE = C2D_Color32(98, 219, 252, 200);
             strcpy(currenttheme, "Homebrew Blue");
         } /* Homebrew Blue */
+
+        switch (reversi) {
+        case 0: //normal
+            textcolor = colA;
+            themecolor = colB;
+            textcolorb = colC;
+            themecolorb = colD;
+            logocolor = colE;
+            strcpy(thememode, "");
+            break;
+        case 1: //reverse
+            textcolor = colC;
+            themecolor = colD;
+            textcolorb = colA;
+            themecolorb = colB;
+            logocolor = colE;
+            strcpy(thememode, "Reverse");
+            break;
+        case 2: //top only
+            textcolor = colA;
+            themecolor = colB;
+            textcolorb = colA;
+            themecolorb = colB;
+            logocolor = colE;
+            strcpy(thememode, "Upper");
+            break;
+        case 3: //bottom only
+            textcolor = colC;
+            themecolor = colD;
+            textcolorb = colC;
+            themecolorb = colD;
+            logocolor = colE;
+            strcpy(thememode, "Lower");
+            break;
+        }
 
         if (hidKeysDown() & KEY_Y) {
             if (rulesvisible < 3) {
                 if (rulesvisible == 0) { //only roll for silly on the first press, not on subsequent ones
                     silly = rand() % 10; // all odds must be in multiples of 10%
+                    chatlock = true; //stop the chat from scrolling while the rules are open
                 }
                 rulesvisible += 1;
             }
             else {
                 rulesvisible = 0;
             }
+            rulescroll = 0;
         } /* You wanna see the rules, huh? Huh? Punk? */ // moved to int so there can be rule pages
 
 
@@ -1035,7 +1091,7 @@ int main() {
                 SwkbdButton button = swkbdInputText(&swkbd, msg, sizeof(msg));
 
                 char sender[460];
-                sprintf(sender, "{\"cmd\":\"CHAT\", \"content\":\"%s\", \"username\":\"%s\", \"password\":\"%s\"}", msg, username, password);
+                sprintf(sender, "{\"cmd\":\"CHAT\", \"content\":\"%s\", \"username\":\"%s\", \"password\":\"%s\", \"platform\":\"%s\"}", msg, username, password, detectsystem);
                 http_post("http://104.236.25.60:3072/api", sender);
             }
             if (isSpriteTapped(&button, 0.8f, 0.8f)) {
@@ -1049,7 +1105,7 @@ int main() {
                 SwkbdButton button = swkbdInputText(&swkbd, msg, sizeof(msg));
 
                 char sender[460];
-                sprintf(sender, "{\"cmd\":\"CHAT\", \"content\":\"%s\", \"username\":\"%s\", \"password\":\"%s\"}", msg, username, password);
+                sprintf(sender, "{\"cmd\":\"CHAT\", \"content\":\"%s\", \"username\":\"%s\", \"password\":\"%s\", \"platform\":\"%s\"}", msg, username, password, detectsystem);
                 http_post("http://104.236.25.60:3072/api", sender);
             }
         }
@@ -1177,7 +1233,7 @@ int main() {
             }
             if (isSpriteTapped(&button2, 0.8f, 0.8f)) {
                 char signuppostbody[128];
-                sprintf(signuppostbody, "{\"cmd\":\"LOGINACC\", \"username\":\"%s\", \"password\":\"%s\"}", username, password);
+                sprintf(signuppostbody, "{\"cmd\":\"LOGINACC\", \"username\":\"%s\", \"password\":\"%s\", \"platform\":\"2DS\"}", username, password);
                 http_post("http://104.236.25.60:3072/api", signuppostbody);
                 sprintf(buftext, "%s", buf);
                 if (strstr(buftext, "LOGIN_OK") != 0) {
@@ -1244,98 +1300,197 @@ int main() {
                 DrawText(", : Toggle Theme", 10.0f, 70.0f, 0, 0.5f, 0.5f, textcolorb, true);
                 DrawText(": Reverse Theme", 10.0f, 90.0f, 0, 0.5f, 0.5f, textcolorb, true);
                 char themealert[40];
-                sprintf(themealert, "Current Theme:\n%s", currenttheme);
-                DrawText(themealert, 10.0f, 200.0f, 0, 0.5f, 0.5f, textcolorb, true);
+                sprintf(themealert, "Current Theme:\n%s\n%s", currenttheme, thememode);
+                DrawText(themealert, 10.0f, 190.0f, 0, 0.5f, 0.5f, textcolorb, true);
             }
 
-            if (rulesvisible == 1) {
+            if (rulesvisible == 1) { //rules here
                 if (silly > 1) { //as in, values of 0, 1, 2, or 3 will trigger the silly rules
-                    DrawText(": Next Page", 10.0f, 10.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("1. No racist, sexist, homophobic, or other", 10.0f, 30.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("prejudiced language or behavior, whether it's", 10.0f, 40.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("aimed at another user or not.", 10.0f, 50.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("2. No asking for or sharing personal info of", 10.0f, 80.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("yourself or anyone else. This includes name,", 10.0f, 90.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("age, gender, location, phone number, email", 10.0f, 100.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("address, or any other personally identifiable", 10.0f, 110.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("information. Doxxing (or the threat of doing so)", 10.0f, 120.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("is grounds for a ban.", 10.0f, 130.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                }
+                    DrawText("1. No racist, sexist, homophobic, or other", 10.0f, (30.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("prejudiced language or behavior, whether it's", 10.0f, (40.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("aimed at another user or not.", 10.0f, (50.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("2. No asking for or sharing personal info of", 10.0f, (80.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("yourself or anyone else. This includes name,", 10.0f, (90.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("age, location, phone number, email address,", 10.0f, (100.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("or any other personally identifiable", 10.0f, (110.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("information. Doxxing (or the threat of doing so)", 10.0f, (120.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("is grounds for a ban.", 10.0f, (130.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("3. No sexual or overly violent behavior or", 10.0f, (160.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("language, including threats of violence or", 10.0f, (170.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("harm of ANY kind. This includes threats or", 10.0f, (180.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("discussion of harming yourself.", 10.0f, (190.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("4. No political discussion. Usernames of", 10.0f, (220.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("political figures are allowed (with some", 10.0f, (230.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("exceptions), but any language that could", 10.0f, (240.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("incite arguments may get you banned.", 10.0f, (250.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("5. No impersonation of developers, moder-", 10.0f, (280.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("ators, admin, or any other Aurorachat staff.", 10.0f, (290.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("Additionally, ANY impersonation for the sake", 10.0f, (300.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("of harrassing another user is not allowed.", 10.0f, (310.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("6. No discussion of piracy, including the", 10.0f, (340.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("sharing of services designed for piracy", 10.0f, (350.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("or encouraging others to pirate media.", 10.0f, (360.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("7. No spamming.", 10.0f, (390.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("8. No hunting.", 10.0f, (420.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("9. No ban evading.", 10.0f, (450.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("10. Be excellent to each other. Act", 10.0f, (480.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("respectfully towards other chatters,", 10.0f, (490.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("and don't harass or bully others.", 10.0f, (500.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    }
                 else {
-                    DrawText(": Next Page", 10.0f, 10.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("1. No saying oatmeal", 10.0f, 25.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("2. Eat burger or else", 10.0f, 40.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("2. No numbers containing 6 or 7", 10.0f, 55.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("3. 100% accurate grammar", 10.0f, 70.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("4. Crow like a rooster when you log in", 10.0f, 85.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("5. Ganondorf Suavemente gif", 10.0f, 100.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("6. no more mr nice guy", 10.0f, 115.0f, 0, 0.5f, 0.5f, textcolorb, true);
-
+                    DrawText("1. No saying oatmeal", 10.0f, (30.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("2. Eat burger or else", 10.0f, (45.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("2. No numbers containing 6 or 7", 10.0f, (60.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("3. 100% accurate grammar", 10.0f, (75.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("4. Crow like a rooster when you log in", 10.0f, (90.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("5. Ganondorf Suavemente gif", 10.0f, (105.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("6. no more mr nice guy", 10.0f, (120.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("7. no hackertron", 10.0f, (135.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("8. eat burger", 10.0f, (150.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("9. Pigs must fly", 10.0f, (165.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("10. No more fortnite", 10.0f, (180.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("11. No battery", 10.0f, (195.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("12. No cats allowed", 10.0f, (210.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("13. No dogs allowed either", 10.0f, (225.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("Alright if I was an animal what animal do you", 10.0f, (240.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("think I would be? SERIOUS ANSWERS ONLY.", 10.0f, (250.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("A rooster. A rat. A rat. A rat. A rat. You’d", 10.0f, (260.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("be a rat. Jerma you’re a rat. You’d be a rat.", 10.0f, (270.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("I think you’d be a rat. I think I’d be a wolf.", 10.0f, (280.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("I think so too. I would be a wolf lion hybrid", 10.0f, (290.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("mix. King of the Junjile— Junjile, but still", 10.0f, (300.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("social and with it and ferocious.", 10.0f, (310.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("Ban evaders will be executed.", 10.0f, (325.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                    DrawText("THANKS FOR READING THE SILLY RULES!", 10.0f, (500.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
                 }
+                C2D_DrawRectSolid(0.0f, 0.0f, 0, 320.0f, 30.0f, themecolor);
+                DrawText(": Next Page | , : Scroll Rules", 10.0f, 10.0f, 0, 0.5f, 0.5f, textcolor, true);
             }
 
-            if (rulesvisible == 2) {
-                if (silly > 1) {
-                    DrawText(": Next Page", 10.0f, 10.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("3. No overly violent or sexual behavior or", 10.0f, 30.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("language, including threats of violence or harm", 10.0f, 40.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("of ANY kind. This includes threats or", 10.0f, 50.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("discussion of harming yourself.", 10.0f, 60, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("4. No political discussion. Usernames of", 10.0f, 90.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("political figures are allowed (with some", 10.0f, 100.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("exceptions), but any language that could incite", 10.0f, 110.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("arguments may get you banned.", 10.0f, 120.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("5. No impersonation of developers,", 10.0f, 150.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("moderators, admin, or any other Aurorachat", 10.0f, 160.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("staff. Additionally, ANY impersonation for the", 10.0f, 170.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("sake of harrassing another user is not allowed.", 10.0f, 180.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                }
-                else {
-                    DrawText(": Next Page", 10.0f, 10.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("7. no hackertron", 10.0f, 25.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("8. eat burger", 10.0f, 40.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("9. Pigs must fly", 10.0f, 55.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("10. No more fortnite", 10.0f, 70.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("11. No battery", 10.0f, 85.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("12. No cats allowed", 10.0f, 100.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("13. No dogs allowed either", 10.0f, 115.0f, 0, 0.5f, 0.5f, textcolorb, true);
-
-                }
+            if (rulesvisible == 2) { // FAQ here
+                DrawText("This is the FAQ--before you ask a question,", 10.0f, (30.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("make sure it's not already listed here!", 10.0f, (40.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("What is this?", 10.0f, (70.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Aurorachat is a chatting application for", 20.0f, (80.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("3DS, Wii, and Wii U.", 20.0f, (90.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Why do some users have {Discord} next to", 10.0f, (120.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("their name?", 10.0f, (130.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("We've got a Discord server with a bot that", 20.0f, (140.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("relays messages between Aurorachat and a", 20.0f, (150.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("dedicated channel. Anyone can join--we've", 20.0f, (160.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("provided a link below:", 20.0f, (170.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("discord.gg/dCSgz7KERv", 20.0f, (180.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("What qualifies as \"personally identifiable", 10.0f, (210.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("information\"?", 10.0f, (220.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("While the examples listed in rule 2 should", 20.0f, (230.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("NEVER be shared online, it's up to the user", 20.0f, (240.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("what they choose to share. Asking for", 20.0f, (250.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("gender and friend codes has historically", 20.0f, (260.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("been permitted, but if someone chooses not", 20.0f, (270.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("to share, DO NOT continue to ask or a", 20.0f, (280.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("moderator may step in to warn you.", 20.0f, (290.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Is [this user] a mod?", 10.0f, (320.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Moderators are present both on the Discord", 20.0f, (330.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("side and the Aurorachat side. Below is a", 20.0f, (340.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("list of users with moderation power:", 20.0f, (350.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                //try to line these up a bit
+                DrawText("Discord:", 10.0f, (360.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("ashes_of_autumn_88546", 10.0f, (370.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("carpetofbluedeath", 10.0f, (380.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("cengoa", 10.0f, (390.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("claudiwolf2056", 10.0f, (400.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("coolguy_63868", 10.0f, (410.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("d3m0nk1ngp1cc0l0", 10.0f, (420.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("dj0194019049857", 10.0f, (430.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("ei_tii", 10.0f, (440.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("fwdrxyy_", 10.0f, (450.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("heytay8", 10.0f, (460.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("holden_mccormick", 10.0f, (470.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("itsfuntum", 10.0f, (480.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("itskal12", 10.0f, (490.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("kingmaw", 10.0f, (500.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("lmutt090", 10.0f, (510.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("orstando", 10.0f, (520.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("pie_300", 10.0f, (530.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("sertarulcelmagic", 10.0f, (540.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("themisterbread", 10.0f, (550.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("virtualleee", 10.0f, (560.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("virxti", 10.0f, (570.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("wildfire0196", 10.0f, (580.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                //wrap here
+                DrawText("Aurorachat:", 170.0f, (360.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("at", 170.0f, (370.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("DKPiccolo", 170.0f, (380.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Evil_bee12", 170.0f, (390.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("hackertron", 170.0f, (400.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("john", 170.0f, (410.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Kal", 170.0f, (420.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("orstando", 170.0f, (430.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("redthunderpower", 170.0f, (440.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Seal", 170.0f, (450.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("sertarulcelmagic", 170.0f, (460.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Unitendo", 170.0f, (470.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("virt", 170.0f, (480.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("'virtualel premium'", 170.0f, (490.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("virtualle", 170.0f, (500.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Wildfire", 170.0f, (510.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("wildfire", 170.0f, (520.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                //and resume here
+                DrawText("Note: most users appear on both lists,", 20.0f, (590.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("but they're not lined up properly here.", 20.0f, (600.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Can I make my own theme?", 10.0f, (630.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Of course! at/ei_tii handles custom theme", 20.0f, (640.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("requests (and I'm online frequently!). A", 20.0f, (650.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("survey has been provided for you to", 20.0f, (660.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("submit original themes:", 20.0f, (670.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("https://forms.gle/XYoKe2NgHM1QH5y98", 20.0f, (680.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Why did I get banned?", 10.0f, (710.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("We try and clearly communicate with users", 20.0f, (720.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("when they're breaking our rules. If we", 20.0f, (730.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("have repeatedly asked you to stop, you", 20.0f, (740.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("will be banned, and we DO NOT accept ban", 20.0f, (750.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("appeals. Reentering chat to ask this", 20.0f, (760.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("question will result in a short response", 20.0f, (770.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("and another ban.", 20.0f, (780.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Are you going to add...", 10.0f, (810.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("Below is a non-exhaustive list of features", 20.0f, (820.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("we plan to add to Aurorachat. Our team is", 20.0f, (830.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("rather small--please be patient with us!", 20.0f, (840.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("- Several rooms/servers to chat in, as", 20.0f, (850.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("well as DMs", 20.0f, (860.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("- Image support", 20.0f, (870.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("- Voice chat support", 20.0f, (880.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("- BGM and sound effects", 20.0f, (890.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("- Moderation improvement (kicking, ban", 20.0f, (900.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("messages, timeoutting, public moder-", 20.0f, (910.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("ation, automatic unbans, \"admin swag\")", 20.0f, (920.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                C2D_DrawRectSolid(0.0f, 0.0f, 0, 320.0f, 30.0f, themecolor);
+                DrawText(": Next Page | , : Scroll Rules", 10.0f, 10.0f, 0, 0.5f, 0.5f, textcolor, true);
             }
 
-            if (rulesvisible == 3) {
-                if (silly > 1) {
-                    DrawText(": Close Rules", 10.0f, 10.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("6. No spamming.", 10.0f, 30.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("7. No hunting.", 10.0f, 45.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("8. No hackertron", 10.0f, 60.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("Friend code sharing is allowed, but please do", 10.0f, 90.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("not harrass or pressure other users for their", 10.0f, 100.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("friend codes.", 10.0f, 110.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("Want access to the rest of Unitendo? Join our", 10.0f, 150.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("official Discord server here:", 10.0f, 160.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("discord.gg/dCSgz7KERv", 10.0f, 175.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("We are not accepting ban appeals at this time.", 10.0f, 220.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                }
-                else {
-                    DrawText(": Hide Rules", 10.0f, 10.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("Alright if I was an animal what animal do you", 10.0f, 30.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("think I would be? SERIOUS ANSWERS ONLY.", 10.0f, 40.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("A rooster. A rat. A rat. A rat. A rat. You’d be", 10.0f, 50.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("a rat. Jerma you’re a rat. You’d be a rat. I", 10.0f, 60.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("think you’d be a rat. I think i’d be a wolf.", 10.0f, 70.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("I think so too. I would be a wolf lion hybrid", 10.0f, 80.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("mix. King of the Junjile— Junjile, but still", 10.0f, 90.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("social and with it and ferocious.", 10.0f, 100.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                    DrawText("No ban appeals. Why can't you listen?", 10.0f, 220.0f, 0, 0.5f, 0.5f, textcolorb, true);
-                }
+            if (rulesvisible == 3) { // changelog here
+                DrawText("The changelog is a work in", 10.0f, (30.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("progress. Check back soon for", 10.0f, (40.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                DrawText("new features we've added!", 10.0f, (50.0f + rulescroll), 0, 0.5f, 0.5f, textcolorb, true);
+                C2D_DrawRectSolid(0.0f, 0.0f, 0, 320.0f, 30.0f, themecolor); // hashtag my rectsolid
+                DrawText(": Close Page | , : Scroll Rules", 10.0f, 10.0f, 0.0f, 0.5f, 0.5f, textcolor, true);
             }
 
             if (hidKeysHeld() & KEY_UP) {
-                    chatscroll = chatscroll + 5;
+                if (!chatlock) {
+                    chatscroll += 5;
+                }
+                if (chatlock) {
+                    rulescroll += 5;
+                }
             }
             if (hidKeysHeld() & KEY_DOWN) {
-                    chatscroll = chatscroll - 5;
+                if (!chatlock) {
+                    chatscroll -= 5;
+                }
+                if (chatlock) {
+                    rulescroll -= 5;
+                }
             }
         }
 
